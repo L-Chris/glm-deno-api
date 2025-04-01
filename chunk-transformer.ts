@@ -49,6 +49,9 @@ export class ChunkTransformer {
     switch (chunkType) {
       case CHUNK_TYPE.TEXT: {
         if (!content.text) return
+        if (this.isThinking) {
+          this.isThinking = false
+        }
         const deltaText = this.isIncrementalChunking ? content.text : content.text.slice(this.content.length)
         this.send({ 
           content: deltaText
@@ -56,15 +59,18 @@ export class ChunkTransformer {
         break
       }
       case CHUNK_TYPE.THINKING: {
+        this.isThinking = true
+        const thinkContent = content.think || content.text || ''
+        const deltaText = this.isIncrementalChunking ? thinkContent : thinkContent.slice(this.content.length)
         this.send({ 
-          reasoning_content: content.think || ''
+          reasoning_content: deltaText
         })
         break
       }
       // 有可能触发多次，在结束前发送即可
       case CHUNK_TYPE.SEARCHING_DONE: {
         this.citations = (part.meta_data.metadata_list || []).map(_ => _.url)
-        this.send({ citations: this.citations })
+        this.send({ citations: this.citations, content: this.isThinking ? '' : content.content, reasoning_content: this.isThinking ? content.content : '' })
         break
       }
       case CHUNK_TYPE.START:
@@ -81,8 +87,9 @@ export class ChunkTransformer {
     const part = chunk.parts[0]
     const content = part?.content?.[0]
     if (chunk.parts.length === 0 && !this.content) return CHUNK_TYPE.START
-    if (!part||!content) return CHUNK_TYPE.NONE
-    if (content.type === 'think') return CHUNK_TYPE.THINKING
+    if (!part || !content || part.status === 'finish') return CHUNK_TYPE.NONE
+    if (content.type === 'think' || content.type === 'text_thinking') return CHUNK_TYPE.THINKING
+    if (part.meta_data.citations) return CHUNK_TYPE.DONE
     if (content.type === 'text') return CHUNK_TYPE.TEXT
     if (content.type === 'browser_result') return CHUNK_TYPE.SEARCHING_DONE
     return CHUNK_TYPE.NONE
