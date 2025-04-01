@@ -36,7 +36,7 @@ export async function createCompletionStream (
         Accept: 'text/event-stream'
       },
       body: JSON.stringify({
-        assistantId: '65940acff94777010aa6b796',
+        assistant_id: '65940acff94777010aa6b796',
         conversation_id: params.config.chat_id,
         messages: params.messages,
         meta_data: {
@@ -93,7 +93,7 @@ export async function createCompletion (params: {
     method: 'POST',
     headers: generateHeaders(refreshToken),
     body: JSON.stringify({
-      assistantId: '65940acff94777010aa6b796',
+      assistant_id: '65940acff94777010aa6b796',
       conversation_id: params.config.chat_id,
       messages: params.messages,
       meta_data: {
@@ -307,6 +307,7 @@ export function generateHeaders (token: string) {
   return {
     Authorization: `Bearer ${token}`,
     Referer: "https://chatglm.cn/main/alltoolsdetail",
+    'Content-Type': 'application/json',
     "X-Device-Id": uuid(false),
     "X-Request-Id": uuid(false),
     Accept: "*/*",

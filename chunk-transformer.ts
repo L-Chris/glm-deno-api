@@ -12,6 +12,7 @@ export class ChunkTransformer {
   private content = ''
   private config: OpenAI.ChatConfig
   private isThinking = false
+  private isIncrementalChunking = false
   private messages: OpenAI.Message[] = []
   private citations: string[] = []
   private sentBlockIndex = -1
@@ -41,20 +42,20 @@ export class ChunkTransformer {
 
     const chunkData: GLM.CompletionChunk = JSON.parse(e.data)
     const chunkType = this.getChunkType(chunkData)
+    if (chunkType === CHUNK_TYPE.NONE) return
     const part = chunkData.parts[0]
-    const content = part.content[0]
+    const content = part?.content?.[0]
 
     switch (chunkType) {
       case CHUNK_TYPE.TEXT: {
         if (!content.text) return
-        this.content += content.text
+        const deltaText = this.isIncrementalChunking ? content.text : content.text.slice(this.content.length)
         this.send({ 
-          content: content.text
+          content: deltaText
         })
         break
       }
       case CHUNK_TYPE.THINKING: {
-        this.content += content.think || ''
         this.send({ 
           reasoning_content: content.think || ''
         })
@@ -69,6 +70,7 @@ export class ChunkTransformer {
       case CHUNK_TYPE.START:
         if (chunkData.conversation_id) {
           this.config.chat_id = chunkData.conversation_id
+          this.isIncrementalChunking = chunkData.meta_data.if_increase_push
         }
         break
     }
@@ -77,9 +79,9 @@ export class ChunkTransformer {
   // 根据对接模型修改
   private getChunkType (chunk: GLM.CompletionChunk) {
     const part = chunk.parts[0]
-    const content = part.content[0]
+    const content = part?.content?.[0]
     if (chunk.parts.length === 0 && !this.content) return CHUNK_TYPE.START
-    if (!part) return CHUNK_TYPE.NONE
+    if (!part||!content) return CHUNK_TYPE.NONE
     if (content.type === 'think') return CHUNK_TYPE.THINKING
     if (content.type === 'text') return CHUNK_TYPE.TEXT
     if (content.type === 'browser_result') return CHUNK_TYPE.SEARCHING_DONE
@@ -106,6 +108,7 @@ export class ChunkTransformer {
           return
         }
         const decodedValue = this.decoder.decode(value)
+        // console.log(decodedValue)
         this.parser.feed(decodedValue)
       }
     } catch (err) {
