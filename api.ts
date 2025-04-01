@@ -255,9 +255,7 @@ async function requestToken(refreshToken: string) {
       result: any
     } = await result.json()
 
-    console.log(body)
-
-    if (body.code !== 0 || !body.result?.accessToken) {
+    if (!body.result?.accessToken) {
       throw new Error(body.message)
     }
 
@@ -302,15 +300,15 @@ async function acquireToken(refreshToken: string): Promise<string> {
     result = await requestToken(refreshToken);
     accessTokenMap.set(refreshToken, result);
   }
-  return result.accessToken?.token;
+  return result.accessToken;
 }
 
 export function generateHeaders (token: string) {
   return {
     Authorization: `Bearer ${token}`,
     Referer: "https://chatglm.cn/main/alltoolsdetail",
-    "X-Device-Id": uuid(),
-    "X-Request-Id": uuid(),
+    "X-Device-Id": uuid(false),
+    "X-Request-Id": uuid(false),
     Accept: "*/*",
     "App-Name": "chatglm",
     'X-App-Platform': "pc",
