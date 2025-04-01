@@ -12,7 +12,6 @@ export class ChunkTransformer {
   private content = ''
   private config: OpenAI.ChatConfig
   private isThinking = false
-  private isIncrementalChunking = false
   private messages: OpenAI.Message[] = []
   private citations: string[] = []
   private sentBlockIndex = -1
@@ -52,7 +51,7 @@ export class ChunkTransformer {
         if (this.isThinking) {
           this.isThinking = false
         }
-        const deltaText = this.isIncrementalChunking ? content.text : content.text.slice(this.content.length)
+        const deltaText = this.config.is_incremental_chunk ? content.text : content.text.slice(this.content.length)
         this.send({ 
           content: deltaText
         })
@@ -61,7 +60,7 @@ export class ChunkTransformer {
       case CHUNK_TYPE.THINKING: {
         this.isThinking = true
         const thinkContent = content.think || content.text || ''
-        const deltaText = this.isIncrementalChunking ? thinkContent : thinkContent.slice(this.content.length)
+        const deltaText = this.config.is_incremental_chunk ? thinkContent : thinkContent.slice(this.content.length)
         this.send({ 
           reasoning_content: deltaText
         })
@@ -76,7 +75,6 @@ export class ChunkTransformer {
       case CHUNK_TYPE.START:
         if (chunkData.conversation_id) {
           this.config.chat_id = chunkData.conversation_id
-          this.isIncrementalChunking = chunkData.meta_data.if_increase_push
         }
         break
     }

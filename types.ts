@@ -98,6 +98,7 @@ export declare namespace OpenAI {
       deepsearching: boolean
     }
     stream: boolean
+    is_incremental_chunk: boolean
     tools: Tool[]
     tool_choice: ToolChoice
     is_tool_calling: boolean

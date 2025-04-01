@@ -36,7 +36,8 @@ export const getChatConfig = (body: {
     tools: tools,
     tool_choice: body.tool_choice || 'auto',
     is_tool_calling,
-    is_tool_calling_done
+    is_tool_calling_done,
+    is_incremental_chunk: parts.includes('deepsearch')
   }
 }
 
