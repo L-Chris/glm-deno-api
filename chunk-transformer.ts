@@ -36,9 +36,6 @@ export class ChunkTransformer {
   // 根据对接模型修改
   private parse (e: EventSourceMessage) {
     if (!e.data) return
-
-    if (/^[[a-z]/.test(e.data)) return
-
     const chunkData: GLM.CompletionChunk = JSON.parse(e.data)
     const chunkType = this.getChunkType(chunkData)
     if (chunkType === CHUNK_TYPE.NONE) return
