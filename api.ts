@@ -1,13 +1,15 @@
-import { uuid, extractJsonFromContent } from './utils.ts'
+import { uuid, extractJsonFromContent, unixTimestamp } from './utils.ts'
 import { OpenAI, GLM } from './types.ts'
 import { approximateTokenSize } from 'tokenx'
 import { ChunkTransformer } from './chunk-transformer.ts'
 import { parseAssistantMessage } from './assistant-message/parse-assistant-message.ts'
 
-export function removeConversation (convId: string, ticket: string) {
+export async function removeConversation (convId: string, ticket: string) {
+  const refreshToken = await acquireToken(ticket)
+  if (!refreshToken) return
   return fetch(`https://chatglm.cn/chatglm/backend-api/assistant/conversation/delete`, {
     method: 'POST',
-    headers: generateHeaders(ticket),
+    headers: generateHeaders(refreshToken),
     body: JSON.stringify({
       assistant_id: '65940acff94777010aa6b796',
       conversation_id: convId
@@ -23,12 +25,14 @@ export async function createCompletionStream (
   },
   callback = () => {}
 ) {
+  const refreshToken = await acquireToken(params.token)
+  if (!refreshToken) return
   const req = await fetch(
     `https://chatglm.cn/chatglm/backend-api/assistant/stream`,
     {
       method: 'POST',
       headers: {
-        ...generateHeaders(params.token),
+        ...generateHeaders(refreshToken),
         Accept: 'text/event-stream'
       },
       body: JSON.stringify({
@@ -65,6 +69,8 @@ export async function createCompletion (params: {
   const config = params.config
   const isJson = params.config.response_format.type === 'json_schema'
   const lastMessage = params.messages.findLast(_ => _.role === 'user')!
+  const refreshToken = await acquireToken(params.token)
+  if (!refreshToken) return
 
   if (isJson) {
     // 如果是JSON格式，添加特殊指令
@@ -85,7 +91,7 @@ export async function createCompletion (params: {
 
   const req = await fetch(`https://chatglm.cn/chatglm/backend-api/assistant/stream`, {
     method: 'POST',
-    headers: generateHeaders(params.token),
+    headers: generateHeaders(refreshToken),
     body: JSON.stringify({
       assistantId: '65940acff94777010aa6b796',
       conversation_id: params.config.chat_id,
@@ -206,6 +212,97 @@ function formatMessageResponse (
     }))
 
   return message
+}
+
+// access_token映射
+const accessTokenMap = new Map();
+// access_token请求队列映射
+const accessTokenRequestQueueMap: Record<string, Function[]> = {};
+
+/**
+ * 请求access_token
+ *
+ * 使用refresh_token去刷新获得access_token
+ *
+ * @param refreshToken 用于刷新access_token的refresh_token
+ */
+async function requestToken(refreshToken: string) {
+  if (accessTokenRequestQueueMap[refreshToken])
+    return new Promise((resolve) =>
+      accessTokenRequestQueueMap[refreshToken].push(resolve)
+    );
+  accessTokenRequestQueueMap[refreshToken] = [];
+  
+  try {
+    const result = await fetch(
+      "https://chatglm.cn/chatglm/backend-api/v1/user/refresh",
+      {
+        method: 'post',
+        headers: generateHeaders(refreshToken),
+        body: JSON.stringify({})
+      }
+    );
+
+    const contentType = result.headers.get('content-type') || ''
+    if (contentType === 'text/html') {
+      console.error('rejected by server')
+      throw new Error('rejected by server')
+    }
+    const body: {
+      code: number
+      status: string
+      message: string
+      result: any
+    } = await result.json()
+
+    console.log(body)
+
+    if (body.code !== 0 || !body.result?.accessToken) {
+      throw new Error(body.message)
+    }
+
+    const token = body?.result?.accessToken
+
+    if (accessTokenRequestQueueMap[refreshToken]) {
+      accessTokenRequestQueueMap[refreshToken].forEach((resolve) =>
+        resolve(result)
+      );
+      delete accessTokenRequestQueueMap[refreshToken];
+    }
+
+    return {
+      accessToken: token,
+      refreshToken: refreshToken,
+      refreshTime: unixTimestamp() + 3600,
+    }
+  } catch(err) {
+    if (accessTokenRequestQueueMap[refreshToken]) {
+      accessTokenRequestQueueMap[refreshToken].forEach((resolve) =>
+        resolve(err)
+      );
+      delete accessTokenRequestQueueMap[refreshToken];
+    }
+  }
+}
+
+/**
+ * 获取缓存中的access_token
+ *
+ * 避免短时间大量刷新token，未加锁，如果有并发要求还需加锁
+ *
+ * @param refreshToken 用于刷新access_token的refresh_token
+ */
+async function acquireToken(refreshToken: string): Promise<string> {
+  let result = accessTokenMap.get(refreshToken);
+  if (!result) {
+    result = await requestToken(refreshToken);
+    accessTokenMap.set(refreshToken, result);
+  }
+  if (unixTimestamp() > result.refreshTime) {
+    result = await requestToken(refreshToken);
+    accessTokenMap.set(refreshToken, result);
+  }
+  return result.accessToken?.token;
 }
 
 export function generateHeaders (token: string) {

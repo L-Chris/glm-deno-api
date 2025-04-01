@@ -4,7 +4,7 @@ import { OpenAI, GLM } from "./types.ts";
 import { SYSTEM_PROMPT } from "./assistant-message/prompts.ts";
 
 export const uuid = (separator = true) => separator ? crypto.randomUUID() : crypto.randomUUID().replace(/\-/g, "")
-
+export const unixTimestamp = () => Math.floor(Date.now() / 1000)
 export const getChatConfig = (body: {
   stream?: boolean
   chat_id?: string
