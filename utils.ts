@@ -3,7 +3,7 @@ import _ from 'lodash'
 import { OpenAI, GLM } from "./types.ts";
 import { SYSTEM_PROMPT } from "./assistant-message/prompts.ts";
 
-export const uuid = () => crypto.randomUUID()
+export const uuid = (separator = true) => separator ? crypto.randomUUID() : crypto.randomUUID().replace(/\-/g, "")
 
 export const getChatConfig = (body: {
   stream?: boolean

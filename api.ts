@@ -216,7 +216,10 @@ export function generateHeaders (token: string) {
     "X-Request-Id": uuid(),
     Accept: "*/*",
     "App-Name": "chatglm",
-    Platform: "pc",
+    'X-App-Platform': "pc",
+    'X-App-Version': '0.0.1',
+    'X-Device-Brand': '',
+    'X-Device-Model': '',
     Origin: "https://chatglm.cn",
     "Sec-Ch-Ua":
       '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
@@ -224,6 +227,5 @@ export function generateHeaders (token: string) {
     "Sec-Ch-Ua-Platform": '"Windows"',
     "User-Agent":
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-    Version: "0.0.1",
   }
 }
